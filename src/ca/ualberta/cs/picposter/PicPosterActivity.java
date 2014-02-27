@@ -1,23 +1,42 @@
 package ca.ualberta.cs.picposter;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.lang.reflect.Type;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
 import ca.ualberta.cs.picposter.controller.PicPosterController;
+import ca.ualberta.cs.picposter.model.PicPostModel;
 import ca.ualberta.cs.picposter.model.PicPosterModelList;
 import ca.ualberta.cs.picposter.view.PicPostModelAdapter;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class PicPosterActivity extends Activity {
 
 
 	public static final int OBTAIN_PIC_REQUEST_CODE = 117;
 
+	private HttpClient httpclient = new DefaultHttpClient();
+	
+	private Gson gson = new Gson();
 
 	EditText searchPostsEditText;
 	ImageView addPicImageView;
@@ -74,11 +93,60 @@ public class PicPosterActivity extends Activity {
 
 
 	public void searchPosts(View view) {
-		String searchTerm = this.searchPostsEditText.getText().toString();
-		
+		final String searchTerm = this.searchPostsEditText.getText().toString();
+
 		//TODO : perform search, update model, etc
+		Thread thread = new Thread(){
+			@Override
+			public void run(){
+				try{
+					HttpPost searchRequest = new HttpPost("http://cmput301.softwareprocess.es:8080/testing/bpoulett/_search?pretty=1&q=" + searchTerm);
+
+					HttpResponse response = httpclient.execute(searchRequest);
+
+					String status = response.getStatusLine().toString();
+					Log.e("Query Response", status);
+					
+					String json = getEntityContent(response);
+					
+					Type elasticSearchSearchResponseType = new TypeToken<ElasticSearchSearchResponse<PicPostModel>>(){}.getType();
+					ElasticSearchSearchResponse<PicPostModel> esResponse = gson.fromJson(json, elasticSearchSearchResponseType);
+					Log.e("Query Reponse",esResponse.toString());
+					
+					for (ElasticSearchResponse<PicPostModel> r : esResponse.getHits()) {
+						final PicPostModel ppm = r.getSource();
+						this.runOnUIThread(new Runnable(){
+							public void run(){
+								model.addPicPostSearch(ppm);
+							}
+						});
+						Log.e("PicPostModel",ppm.toString());
+						}
+						
+				}
+				catch(Exception e)
+				{
+					e.printStackTrace();
+				}
+			}
+		};
+		thread.start();
 		
+
 		this.searchPostsEditText.setText(null);
 		this.searchPostsEditText.setHint(R.string.search_posts_edit_text_hint);
+	}
+	
+	public String getEntityContent(HttpResponse response) throws IOException {
+		BufferedReader br = new BufferedReader(
+				new InputStreamReader((response.getEntity().getContent())));
+		String output;
+		String json = "";
+		while ((output = br.readLine()) != null) {
+			Log.e("OUTPUT", output);
+			json += output;
+		}
+		Log.e("JSON", json);
+		return json;
 	}
 }

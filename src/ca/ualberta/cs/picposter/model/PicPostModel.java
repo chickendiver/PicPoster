@@ -15,7 +15,7 @@ public class PicPostModel {
 	private String text;
 	private Date timestamp;
 	
-	
+	//MUST CONVERT BITMAP TO BASE 64 FORMAT BEFORE SENDING IT TO ELASTICSEARCH: http://stackoverflow.com/questions/9224056/android-bitmap-to-base64-string
 	public PicPostModel(String text, Date timestamp) {
 		//this.picture = picture;
 		this.text = text;
